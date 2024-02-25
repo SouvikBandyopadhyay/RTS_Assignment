@@ -51,6 +51,24 @@ void signal_handler(int signum)
     }
 }
 
+// Function to perform semaphore P (wait) operation
+void sem_wait(int semid) {
+    struct sembuf sem_op;
+    sem_op.sem_num = 0;
+    sem_op.sem_op = -1;
+    sem_op.sem_flg = 0;
+    semop(semid, &sem_op, 1);
+}
+
+// Function to perform semaphore V (signal) operation
+void sem_signal(int semid) {
+    struct sembuf sem_op;
+    sem_op.sem_num = 0;
+    sem_op.sem_op = 1;
+    sem_op.sem_flg = 0;
+    semop(semid, &sem_op, 1);
+}
+
 int main()
 {
     signal(SIGINT, signal_handler);
@@ -62,7 +80,8 @@ int main()
     Vop.sem_op = 1;
     Vop.sem_flg = SEM_UNDO;
 
-    key_t key = ftok("producer.c", 'a');
+    key_t key = ftok("producer2.c", 'a');
+    key_t key2 = ftok("producer2.c", 'b');
     shmid = shmget(key, sizeof(struct CircularQueue), IPC_CREAT | 0666);
     struct CircularQueue *queue = (struct CircularQueue *)shmat(shmid, NULL, 0);
 
@@ -73,18 +92,33 @@ int main()
     semun.val = MAX_QUEUE_SIZE;
     semctl(semid, 1, SETVAL, semun); //  initialising semaphore 1 to MAX_QUEUE_SIZE
 
-    srand(time(NULL));
+
+    // Creating semaphore
+    int sem_id = semget(key2, 1, 0666 | IPC_CREAT);
+    if (sem_id == -1) {
+        perror("semget");
+        exit(EXIT_FAILURE);
+    }
+    // Initialising semaphore value to 1
+    union Semun arg;
+    arg.val = 1;
+    if (semctl(sem_id, 0, SETVAL, arg) == -1) {
+        perror("semctl");
+        exit(EXIT_FAILURE);
+    }
 
     while (1)
     {
         P(semid); // Waiting for available space in the queue
-
+        // Entering critical section
+        sem_wait(sem_id);  
         int item = rand() % 100; // Generating a random integer
         queue->buffer[queue->tail] = item;
         queue->tail = (queue->tail + 1) % MAX_QUEUE_SIZE;
 
         printf("Produced item: %d\n", item);
-
+        // Exiting critical section
+        sem_signal(sem_id);
         V(semid); // Signaling that an item has been produced
         sleep(2); 
     }

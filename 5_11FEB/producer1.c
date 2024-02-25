@@ -59,7 +59,7 @@ int main()
     Vop.sem_op = 1;
     Vop.sem_flg = SEM_UNDO;
 
-    key_t key = ftok("producer.c", 'a');
+    key_t key = ftok("producer1.c", 'a');
     shmid = shmget(key, MAX_QUEUE_SIZE*sizeof(int), IPC_CREAT | 0666);
     int *queue = (int *)shmat(shmid, NULL, 0);
     int tail=0;
