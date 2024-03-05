@@ -1,85 +1,105 @@
+// 2 variables pthreadno and cthreadno are maintained to keep track of how many producer and consumer thread to keep alive
+// to kill a thread ... corrosponding variable value is reduced
+// a thread will run if its corrosponding thread no. is less than the current (p/c)threadno of that type
+// min no of threads is set to 1 of each kind and max to 5, m=2 and n=3
+// some warnings are encoundered during compilation due to type casting although program runns fine
+// ==================================================================================================
+// ||   MANAGER:
+// ||       Enter 
+// ||       1 to increase producers,
+// ||       2 to decrease producers,                             
+// ||       3 to increase consumers, 
+// ||       4 to decrease consumers, 
+// ||       0 to exit:
+// ||
+// ===================================================================================================
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <pthread.h>
-#include <semaphore.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-#define BUFFER_SIZE 5
-#define MAX_PRODUCERS 5
-#define MAX_CONSUMERS 5
+#define queLen 10
+#define maxproducer 5
+#define maxconsumer 5
+#define m 2
+#define n 3
 
-// Circular queue structure
-typedef struct
+int pthreadno = 0, cthreadno = 0;
+int queue[queLen];
+int head = 0, tail = 0, count = 0;
+pthread_mutex_t mutex;
+pthread_cond_t cond;
+pthread_t mthread;
+pthread_t cthreads[maxconsumer];
+pthread_t pthreads[maxproducer];
+
+void enqueue(int value)
 {
-    int items[BUFFER_SIZE];
-    int head;
-    int tail;
-} CircularQueue;
-
-CircularQueue queue;
-
-int num_producers = 2;
-int num_consumers = 2;
-int exit_producers = 0;
-int exit_consumers = 0;
-
-sem_t mutex, full, empty;
-
-void initQueue()
-{
-    queue.head = 0;
-    queue.tail = 0;
-}
-
-void enqueue(int item)
-{
-    queue.items[queue.head] = item;
-    queue.head = (queue.head + 1) % BUFFER_SIZE;
+    queue[head] = value;
+    head = (head + 1) % queLen;
+    count++;
 }
 
 int dequeue()
 {
-    int item = queue.items[queue.tail];
-    queue.tail = (queue.tail + 1) % BUFFER_SIZE;
-    return item;
+    int value = queue[tail];
+    tail = (tail + 1) % queLen;
+    count--;
+    return value;
+}
+
+int num_free_spaces()
+{
+    return queLen - count;
+}
+
+int num_filled_spaces()
+{
+    return count;
 }
 
 void *producer(void *arg)
 {
-    int item = 0;
-    while (!exit_producers)
+    int threadid = (int)arg;
+    while (threadid < pthreadno)
     {
-        sem_wait(&empty);
-        sem_wait(&mutex);
-
-        item++; // Producing a new item
+        pthread_mutex_lock(&mutex);
+        while (num_free_spaces() == 0)
+        {
+            printf("Producer %d waiting\n", (int)arg);
+            pthread_cond_wait(&cond, &mutex);
+        }
+        int item = rand() % 100; // Generate random item
         enqueue(item);
-        printf("Produced: %d\n", item);
-
-        sem_post(&mutex);
-        sem_post(&full);
-        sleep(1);
+        printf("Produced by thread %d: %d\n", (int)arg, item);
+        pthread_mutex_unlock(&mutex);
+        pthread_cond_broadcast(&cond);
+        sleep(4);
+        // getchar();
     }
-    pthread_exit(NULL);
+    return NULL;
 }
 
 void *consumer(void *arg)
 {
-    int item;
-    while (!exit_consumers)
+    int threadid = (int)arg;
+    while (threadid < cthreadno)
     {
-        sem_wait(&full);
-        sem_wait(&mutex);
-
-        item = dequeue();
-        printf("Consumed: %d\n", item);
-
-        sem_post(&mutex);
-        sem_post(&empty);
-        sleep(2);
+        pthread_mutex_lock(&mutex);
+        while (num_filled_spaces() == 0)
+        {
+            printf("Consumer %d waiting\n", (int)arg);
+            pthread_cond_wait(&cond, &mutex);
+        }
+        int item = dequeue();
+        printf("Consumed by thread %d: %d\n", (int)arg, item);
+        pthread_mutex_unlock(&mutex);
+        pthread_cond_signal(&cond);
+        sleep(4);
+        // getchar();
     }
-    pthread_exit(NULL);
+    return NULL;
 }
 
 void *manager(void *arg)
@@ -94,11 +114,17 @@ void *manager(void *arg)
         switch (choice)
         {
         case 1:
-            if (num_producers < MAX_PRODUCERS)
+            if (pthreadno < maxproducer)
             {
-                num_producers++;
-                pthread_t new_producer;
-                pthread_create(&new_producer, NULL, producer, NULL);
+                // create producer
+                // add to array
+                if (pthread_create(&pthreads[pthreadno], NULL, producer, (void *)pthreadno) != 0)
+                {
+                    perror("pthread_create");
+                }
+                // incriment pthreadno
+                pthreadno++;
+                printf("increased producers to %d\n",pthreadno);
             }
             else
             {
@@ -106,13 +132,13 @@ void *manager(void *arg)
             }
             break;
         case 2:
-            if (num_producers > 0)
+            if (pthreadno > 1)
             {
-                num_producers--;
-                exit_producers = 1;
-                // Allowing some time for producers to exit
+                // kill producer thread
+                // decriment pthreadno
+                pthreadno--;
                 sleep(2);
-                exit_producers = 0;
+                printf("decreased producer to %d\n",pthreadno);
             }
             else
             {
@@ -120,11 +146,17 @@ void *manager(void *arg)
             }
             break;
         case 3:
-            if (num_consumers < MAX_CONSUMERS)
+            if (cthreadno < maxconsumer)
             {
-                num_consumers++;
-                pthread_t new_consumer;
-                pthread_create(&new_consumer, NULL, consumer, NULL);
+                // add consumer thread
+                // add to array
+                if (pthread_create(&cthreads[cthreadno], NULL, consumer, (void *)cthreadno) != 0)
+                {
+                    perror("cthread_create");
+                }
+                // incriment cthreadno
+                cthreadno++;
+                printf("increased consumers to %d\n",cthreadno);
             }
             else
             {
@@ -132,13 +164,13 @@ void *manager(void *arg)
             }
             break;
         case 4:
-            if (num_consumers > 0)
+            if (cthreadno > 1)
             {
-                num_consumers--;
-                exit_consumers = 1;
-                // Allowing some time for consumers to exit
+                // kill producer thread
+                // decriment pthreadno
+                cthreadno--;
                 sleep(2);
-                exit_consumers = 0;
+                printf("decreased consumers to %d\n",cthreadno);
             }
             else
             {
@@ -146,58 +178,57 @@ void *manager(void *arg)
             }
             break;
         case 0:
-            exit_producers = 1;
-            exit_consumers = 1;
-            // Allowing some time for threads to exit
-            sleep(2);
-            printf("Exiting...\n");
+            // kill all threads
+            pthreadno = 0;
+            cthreadno = 0;
             exit(0);
         default:
             printf("Invalid choice\n");
         }
     }
 }
-
 int main()
 {
-    pthread_t producers[MAX_PRODUCERS], consumers[MAX_CONSUMERS], mgr_thread;
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&cond, NULL);
 
-    sem_init(&mutex, 0, 1);
-    sem_init(&full, 0, 0);
-    sem_init(&empty, 0, BUFFER_SIZE);
-
-    initQueue();
-
-    // Creating initial producer threads
-    for (int i = 0; i < num_producers; i++)
+    if (pthread_create(&mthread, NULL, manager, (void *)NULL) != 0)
     {
-        pthread_create(&producers[i], NULL, producer, NULL);
+        perror("mthread_create");
+    }
+    for (int i = 0; i < m; ++i)
+    {
+        if (pthread_create(&pthreads[i], NULL, producer, (void *)pthreadno) != 0)
+        {
+            perror("pthread_create");
+        }
+        pthreadno++;
+        sleep(2);
+    }
+    for (int i = 0; i < n; ++i)
+    {
+        if (pthread_create(&cthreads[i], NULL, consumer, (void *)cthreadno) != 0)
+        {
+            perror("cthread_create");
+        }
+        cthreadno++;
     }
 
-    // Creating initial consumer threads
-    for (int i = 0; i < num_consumers; i++)
+    // Join threads
+    for (int i = 0; i < pthreadno; ++i)
     {
-        pthread_create(&consumers[i], NULL, consumer, NULL);
+        if (pthread_join(pthreads[i], NULL) != 0)
+        {
+            perror("pthread_join");
+        }
     }
-
-    // Creating manager thread
-    pthread_create(&mgr_thread, NULL, manager, NULL);
-
-    // Joining threads
-    for (int i = 0; i < num_producers; i++)
+    for (int i = 0; i < cthreadno; ++i)
     {
-        pthread_join(producers[i], NULL);
+        if (pthread_join(cthreads[i], NULL) != 0)
+        {
+            perror("cthread_join");
+        }
     }
-    for (int i = 0; i < num_consumers; i++)
-    {
-        pthread_join(consumers[i], NULL);
-    }
-    pthread_join(mgr_thread, NULL);
-
-    // Destroying semaphores
-    sem_destroy(&mutex);
-    sem_destroy(&full);
-    sem_destroy(&empty);
-
-    return 0;
+    pthread_cond_destroy(&cond);
+    pthread_mutex_destroy(&mutex);
 }
