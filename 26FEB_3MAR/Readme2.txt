@@ -2,6 +2,12 @@
 // * LATEST SOLUTION:
 // * The recent bug was happening because manager thread was not joined in main,                     *
 // * to solve the problem, I created and joined the manager thread after the producer and consumer.  *
+// * more checks are addded in manager funtion to make threads join even after return.               *
+// * Every time a thread is killed from manager, the thread's corrosponding condtitional varibale is *
+// * woken up, and the condition is modified in such a way that a thread cannot consume or produce   *
+// * an item after it has been killed, and must unlock it's mutex for fellow threads of same type    *
+// * and the conditional variable and execute pthread_exit() to which manager and main has join      *
+// * statements to capture                                                                           *
 // ***************************************************************************************************
 // _________________________________________________________________________________________________________
 // 2 variables current_no_of_producer_threads and current_no_of_consumer_threads are maintained to keep track of how many producer and consumer thread to keep alive
