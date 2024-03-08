@@ -1,3 +1,9 @@
+// ***************************************************************************************************
+// * LATEST SOLUTION:
+// * The recent bug was happening because manager thread was not joined in main,                     *
+// * to solve the problem, I created and joined the manager thread after the producer and consumer.  *
+// ***************************************************************************************************
+// _________________________________________________________________________________________________________
 // 2 variables current_no_of_producer_threads and current_no_of_consumer_threads are maintained to keep track of how many producer and consumer thread to keep alive
 // to kill a thread ... corrosponding variable value is reduced
 // a thread will run if its corrosponding thread no. is less than the current (p/c)threadno of that type
@@ -13,6 +19,26 @@
 // ||       0 to exit:
 // ||
 // ===================================================================================================
+// ===============================================================================================
+// The current execution works like this:
+
+// 2 arrays of threads are created along with a manager thread
+
+// the manager thread takes 4 inputs on input
+
+// 1: create a P_thread pass P_thread_number as argument and increment the P_thread_number and add to P_thread_array
+
+// 2: decrement the P_thread_number
+
+// 3: create a C_thread pass C_thread_number as argument and increment the C_thread_number and add to C_thread_array
+
+// 4: decrement the C_thread_number
+
+// The producer and consumer threads gets argemtn makes it there thread_ID
+// then in an infinite loop checks if there thread_ID is less than the current_number_of_thread_of_that_type
+// If true dose its JOB*
+// else returns
+// Finally unreturned threads are joined
 
 #include <stdio.h>
 #include <pthread.h>
@@ -146,6 +172,10 @@ void *manager(void *arg)
                 // decriment current_no_of_producer_threads
                 current_no_of_producer_threads--;
                 sleep(2);
+                // if (pthread_join(producer_threads[current_no_of_producer_threads], NULL) != 0)
+                // {
+                //     perror("pthread_join");
+                // }
                 printf("\t\tdecreased producer to %d\n", current_no_of_producer_threads);
             }
             else
@@ -178,6 +208,10 @@ void *manager(void *arg)
                 // decriment current_no_of_producer_threads
                 current_no_of_consumer_threads--;
                 sleep(2);
+                // if (pthread_join(consumer_threads[current_no_of_consumer_threads], NULL) != 0)
+                // {
+                //     perror("pthread_join");
+                // }
                 printf("\t\tdecreased consumers to %d\n", current_no_of_consumer_threads);
             }
             else

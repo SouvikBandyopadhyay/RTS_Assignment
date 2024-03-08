@@ -24,7 +24,7 @@ In the Final solution I will change some variable names for better readability,
 and try to fix the problem. 
 
 =============================================================================================== 
-The current execution workds like this:
+The current execution works like this:
 
 2 arrays of threads are created along with a manager thread
 
