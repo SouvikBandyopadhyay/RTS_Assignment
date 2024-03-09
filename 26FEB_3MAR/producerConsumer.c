@@ -2,6 +2,12 @@
 // * LATEST SOLUTION:
 // * The recent bug was happening because manager thread was not joined in main,                     *
 // * to solve the problem, I created and joined the manager thread after the producer and consumer.  *
+// * more checks are addded in manager funtion to make threads join even after return.               *
+// * Every time a thread is killed from manager, the thread's corrosponding condtitional varibale is *
+// * woken up, and the condition is modified in such a way that a thread cannot consume or produce   *
+// * an item after it has been killed, and must unlock it's mutex for fellow threads of same type    *
+// * and the conditional variable and execute pthread_exit() to which manager and main has join      *
+// * statements to capture                                                                           *
 // ***************************************************************************************************
 // _________________________________________________________________________________________________________
 // 2 variables current_no_of_producer_threads and current_no_of_consumer_threads are maintained to keep track of how many producer and consumer thread to keep alive
@@ -87,12 +93,13 @@ int num_filled_spaces()
 
 void *producer(void *arg)
 {
+    int t = 7; // time to sleep
     int threadID = (int)arg;
     // Thread will run if ThreadID is lesser than Current no of producer threads else return
     while (threadID < current_no_of_producer_threads)
     {
         pthread_mutex_lock(&producer_mutex);
-        while (num_free_spaces() == 0)
+        while ((num_free_spaces() == 0) && (threadID < current_no_of_producer_threads))
         {
             printf("Producer %d waiting\n", threadID);
             pthread_cond_wait(&item_consumed_cond, &producer_mutex);
@@ -103,22 +110,28 @@ void *producer(void *arg)
             enqueue(item);
             printf("Produced by thread %d: %d\n", threadID, item);
         }
+        else
+        {
+            t = 0;
+        }
         pthread_mutex_unlock(&producer_mutex);
         pthread_cond_broadcast(&item_produced_cond);
-        sleep(6);
+        sleep(t);
         // getchar();
     }
+    pthread_exit(NULL);
     return NULL;
 }
 
 void *consumer(void *arg)
 {
+    int t = 7; // time to sleep
     int threadID = (int)arg;
     // Thread will run if ThreadID is lesser than Current no of consumer threads else return
     while (threadID < current_no_of_consumer_threads)
     {
         pthread_mutex_lock(&consumer_mutex);
-        while (num_filled_spaces() == 0)
+        while ((num_filled_spaces() == 0) && (threadID < current_no_of_consumer_threads))
         {
             printf("\t\t\t\tConsumer %d waiting\n", threadID);
             pthread_cond_wait(&item_produced_cond, &consumer_mutex);
@@ -128,11 +141,16 @@ void *consumer(void *arg)
             int item = dequeue();
             printf("\t\t\t\tConsumed by thread %d: %d\n", threadID, item);
         }
+        else
+        {
+            t = 0;
+        }
         pthread_mutex_unlock(&consumer_mutex);
         pthread_cond_broadcast(&item_consumed_cond);
-        sleep(7);
+        sleep(t);
         // getchar();
     }
+    pthread_exit(NULL);
     return NULL;
 }
 
@@ -171,11 +189,12 @@ void *manager(void *arg)
                 // kill producer thread
                 // decriment current_no_of_producer_threads
                 current_no_of_producer_threads--;
+                pthread_cond_broadcast(&item_consumed_cond);
                 sleep(2);
-                // if (pthread_join(producer_threads[current_no_of_producer_threads], NULL) != 0)
-                // {
-                //     perror("pthread_join");
-                // }
+                if (pthread_join(producer_threads[current_no_of_producer_threads], NULL) != 0)
+                {
+                    perror("pthread_join");
+                }
                 printf("\t\tdecreased producer to %d\n", current_no_of_producer_threads);
             }
             else
@@ -207,11 +226,12 @@ void *manager(void *arg)
                 // kill producer thread
                 // decriment current_no_of_producer_threads
                 current_no_of_consumer_threads--;
+                pthread_cond_broadcast(&item_produced_cond);
                 sleep(2);
-                // if (pthread_join(consumer_threads[current_no_of_consumer_threads], NULL) != 0)
-                // {
-                //     perror("pthread_join");
-                // }
+                if (pthread_join(consumer_threads[current_no_of_consumer_threads], NULL) != 0)
+                {
+                    perror("cthread_join");
+                }
                 printf("\t\tdecreased consumers to %d\n", current_no_of_consumer_threads);
             }
             else
@@ -223,7 +243,10 @@ void *manager(void *arg)
             // kill all threads
             current_no_of_producer_threads = 0;
             current_no_of_consumer_threads = 0;
-            exit(0);
+            pthread_cond_broadcast(&item_consumed_cond);
+            pthread_cond_broadcast(&item_produced_cond);
+
+            pthread_exit(NULL);
         default:
             printf("\t\tInvalid choice\n");
         }
