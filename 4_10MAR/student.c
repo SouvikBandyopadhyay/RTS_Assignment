@@ -375,7 +375,7 @@ void modify_student_by_roll(int choice, int roll,FILE *data_file, FILE *index_fi
                             int in;
                             printf("\nenter desc: ");
                             char tempDesc[MAX_DESC];
-                            scanf("%[^\n]s",tempDesc);
+                            scanf(" %[^\n]s",tempDesc);
                             strcat(tempDesc,"\0");
                             // Dynamically allocate memory for description based on input size
                             s1.desc = (char *)malloc((strlen(tempDesc) + 1) * sizeof(char));
