@@ -41,7 +41,7 @@ struct student create_student() {
     printf("Enter description: ");
     char tempDesc[MAX_DESC];
     scanf("%[^\n]s",tempDesc);
-
+    strcat(tempDesc,"\0");
     // Dynamically allocate memory for description based on input size
     s.desc = (char *)malloc((strlen(tempDesc) + 1) * sizeof(char));
     strcpy(s.desc, tempDesc);
@@ -68,13 +68,15 @@ void add_student(int slot, struct student s,FILE *data_file, FILE *index_file){
     printf("\n calculated offset %ld\n",offset);
 
     // at the end of data file add a student info
-    int siz=sizeof(s.desc);
     lseek(data_file->_fileno, 0, SEEK_END);
     write(data_file->_fileno,&s.roll, sizeof(s.roll));
-    write(data_file->_fileno,s.fname, sizeof(s.fname));
-    write(data_file->_fileno,s.mname, sizeof(s.mname));
-    write(data_file->_fileno,s.sname, sizeof(s.fname));
-    write(data_file->_fileno,s.desc, sizeof(s.fname));
+    write(data_file->_fileno,s.fname, sizeof(char)*50);
+    write(data_file->_fileno,s.mname, sizeof(char)*50);
+    write(data_file->_fileno,s.sname, sizeof(char)*50);
+    write(data_file->_fileno,s.desc, sizeof(char)*strlen(s.desc));
+    write(data_file->_fileno,"\n", sizeof(char));
+    write(data_file->_fileno,"\0", sizeof(char));
+
 
     int item;
     lseek(index_file->_fileno, sizeof(int)+sizeof(off_t)*first_int, SEEK_SET);
@@ -91,20 +93,25 @@ void add_student(int slot, struct student s,FILE *data_file, FILE *index_file){
     read(data_file->_fileno, &tempstr, sizeof(char)*50);
     printf("\nsname:%s",tempstr);
 
-    if (fgets(tempstr, MAX_DESC, data_file) != NULL) {
-        
-            printf("\ndesc: %s\n",tempstr);
-    } else {
-        printf("Error reading from file\n");
+    int j=0;
+    char ch=fgetc(data_file);
+    while ((ch != '\n') && (ch != EOF) && (ch != '\0')) {
+        tempstr[j]=ch;
+        j++;
+        // printf("\n char from file :%c", ch); // Print character or do whatever processing you need
+        ch=fgetc(data_file);
     }
-    // read(data_file->_fileno, &tempstr, sizeof(char)*MAX_DESC);
-    // printf("\ndesc:%s",tempstr);
+    tempstr[j]='\0';
+
+    printf("\ndesc:%s",tempstr);
 
     if (slot<0)
     {
         first_int=first_int+1;
         lseek(index_file->_fileno, 0, SEEK_SET);
         write(index_file->_fileno,&first_int, sizeof(first_int));
+        lseek(data_file->_fileno, 0, SEEK_SET);
+        write(data_file->_fileno,&first_int, sizeof(first_int));
         printf("\n slot by default %d\n",slot);
     }
     
@@ -143,22 +150,56 @@ struct student *search_student_by_index(struct student *s,int i, FILE *data_file
     read(data_file->_fileno,s->fname,sizeof(char)*50);
     read(data_file->_fileno,s->mname,sizeof(char)*50);
     read(data_file->_fileno,s->sname,sizeof(char)*50);
-    off_t currpointer=lseek(data_file->_fileno,0,SEEK_CUR);
-    off_t fileend=lseek(data_file->_fileno,0,SEEK_END);
-    lseek(data_file->_fileno,currpointer,SEEK_SET);
-    off_t maxlen=fileend-currpointer;
-    printf("\nmaxlen=%ld\n",maxlen);
-    char desc[maxlen];
+    // off_t currpointer=lseek(data_file->_fileno,0,SEEK_CUR);
+    // off_t fileend=lseek(data_file->_fileno,0,SEEK_END);
+    // lseek(data_file->_fileno,currpointer,SEEK_SET);
+    // off_t maxlen=fileend-currpointer;
+    // printf("\nmaxlen=%ld\n",maxlen);
 
-    if (fgets(desc, maxlen, data_file) != NULL) {
-        
-            printf("\n desc %s\n",desc);
-            s->desc = (char *)malloc((strlen(desc) + 1) * sizeof(char));
-            strcpy(s->desc,desc);
-    } else {
-        printf("Error reading from file\n");
+    char desc[MAX_DESC];
+    int j=0;
+    char ch[1];
+    read(data_file->_fileno,ch,sizeof(char));
+    // printf("\nfirst char from file :%c", ch[0]); // Print character or do whatever processing you need
+    while ((ch[0] != '\n') && (ch[0] != EOF) && (ch[0] != '\0') && (j<15)) {
+        desc[j]=ch[0];
+        j++;
+        // printf("\n char from file :%c", ch[0]); // Print character or do whatever processing you need
+        read(data_file->_fileno,ch,sizeof(char));
     }
-    printf("\n desc in s %s\n",s->desc);
+    desc[j]='\0';
+
+    printf("\ndesc :%s of len:%ld\n",desc,strlen(desc));
+    s->desc=(char *)malloc((strlen(desc) + 1) * sizeof(char));
+    strcpy(s->desc,desc);
+    // if (fgets(desc, MAX_DESC, data_file) != NULL) {
+        
+    //         printf("\ndesc: %s\n",desc);
+    // } else {
+    //     printf("Error reading from file\n");
+    // }
+
+    // int j=0;
+    // char ch=fgetc(data_file);
+    // while ((ch != '\n') && (ch != EOF) && (ch != '\0')) {
+    //     desc[j]=ch;
+    //     j++;
+    //     printf("%c", ch); // Print character or do whatever processing you need
+    //     ch=fgetc(data_file);
+    // }
+    // s->desc = (char *)malloc((j + 1) * sizeof(char));
+    // strcpy(s->desc,desc);
+    // printf("\n desc in s %s\n",s->desc);
+
+    // if (fgets(desc, maxlen, data_file) != NULL) {
+        
+    //         printf("\n desc %s\n",desc);
+    //         s->desc = (char *)malloc((strlen(desc) + 1) * sizeof(char));
+    //         strcpy(s->desc,desc);
+    // } else {
+    //     printf("Error reading from file\n");
+    // }
+    // printf("\n desc in s %s\n",s->desc);
     return s;
 } 
 
@@ -175,12 +216,15 @@ void search_student_by_roll(int roll, FILE *data_file, FILE *index_file){
                 if (s1.roll==roll)
                 {
                     // Display the student record 
+                    printf("\n**************************************\n\n");
                     printf("\nStudent Record by Roll: \n");
                     printf("Roll: %d\n", s1.roll);
                     printf("First Name: %s\n", s1.fname);
                     printf("Middle Name: %s\n", s1.mname);
                     printf("Surname: %s\n", s1.sname);
                     printf("Description: %s\n", s1.desc);
+                    printf("INDEX: %d\n", i);
+                    printf("\n\n**************************************\n");
                     free(s1.desc);
                     break;
                 }
@@ -328,13 +372,14 @@ void modify_student_by_roll(int choice, int roll,FILE *data_file, FILE *index_fi
                             break;
                         }
                         case 5: {
-                            char long_str[MAX_DESC];
-                            printf("Enter a long string (up to %d characters): ", MAX_DESC - 1);
-                            scanf("%[^\n]", long_str); // Read up to 99 characters, avoiding buffer overflow
-                            printf("You entered: %s\n", long_str);
-                            free(s1.desc);
-                            s1.desc = (char *)malloc((strlen(long_str) + 1) * sizeof(char));
-                            strcpy(s1.desc,long_str); 
+                            int in;
+                            printf("\nenter desc: ");
+                            char tempDesc[MAX_DESC];
+                            scanf("%[^\n]s",tempDesc);
+                            strcat(tempDesc,"\0");
+                            // Dynamically allocate memory for description based on input size
+                            s1.desc = (char *)malloc((strlen(tempDesc) + 1) * sizeof(char));
+                            strcpy(s1.desc,tempDesc); 
                             break;
                         }
                         default:
@@ -422,16 +467,19 @@ void deleteStudent_by_roll(int roll,FILE *data_file, FILE *index_file)
     } else {
         perror("Error renaming file");
     }
-    lseek(index_file->_fileno,0,SEEK_SET);
-    read(index_file->_fileno,&no_of_students,sizeof(int));
+    lseek(tempindex->_fileno,0,SEEK_SET);
+    read(tempindex->_fileno,&no_of_students,sizeof(int));
+    lseek(tempdata->_fileno,0,SEEK_SET);
+    read(tempdata->_fileno,&no_of_students,sizeof(int));
     printf("\nAfter deleting %d students\n",no_of_students); 
+    close(tempindex->_fileno);
+    close(tempdata->_fileno);
 }
 
 void compress_files(FILE *data_file, FILE *index_file){
     lseek(index_file->_fileno,0,SEEK_SET);
     int no_of_students;
     read(index_file->_fileno,&no_of_students,sizeof(int));
-    printf("\nbefore deleting %d students\n",no_of_students);
     int flag=0;
 
     // Open student.index file
@@ -467,7 +515,7 @@ void compress_files(FILE *data_file, FILE *index_file){
         struct student s1;
         
         search_student_by_index(&s1,i,data_file,index_file);
-            add_student(-1,s1,tempdata,tempindex);
+        add_student(-1,s1,tempdata,tempindex);
     }
     close(data_file->_fileno);
     close(index_file->_fileno);
@@ -493,7 +541,8 @@ void compress_files(FILE *data_file, FILE *index_file){
     }
     lseek(index_file->_fileno,0,SEEK_SET);
     read(index_file->_fileno,&no_of_students,sizeof(int));
-    printf("\nAfter deleting %d students\n",no_of_students); 
+    close(tempindex->_fileno);
+    close(tempdata->_fileno);
 }
 
 // void deleteStudent_by_roll(int roll,FILE *data_file, FILE *index_file)
@@ -538,33 +587,20 @@ void compress_files(FILE *data_file, FILE *index_file){
 
 int main() {
     int choice;
-    FILE *index_file = fopen("student.index", "w");
+    FILE *index_file = fopen("student.index", "r+");
     if (index_file == NULL) {
         printf("Error opening student.index file.\n");
         return 0;
     }
     // Open student.data file for appending
-    FILE *data_file = fopen("student.data", "w");
-    if (data_file == NULL) {
-        printf("Error opening student.data file.\n");
-        return 0;
-    }
-    close(data_file->_fileno);
-    close(index_file->_fileno);
-    // Open student.index file
-    index_file = fopen("student.index", "r+");
-    if (index_file == NULL) {
-        printf("Error opening student.index file.\n");
-        return 0;
-    }
-    // Open student.data file for appending
-    data_file = fopen("student.data", "r+");
+    FILE *data_file = fopen("student.data", "r+");
     if (data_file == NULL) {
         printf("Error opening student.data file.\n");
         return 0;
     }
     
     while (1) {
+        printf("\n");
         printf("Enter your choice (1-7):\n");
         printf("1. Initialise file\n");
         printf("2. Create student\n");
@@ -603,12 +639,13 @@ int main() {
                     search_student_by_index(&s1,search_index,data_file,index_file);
 
                     // Display the student record 
-                    printf("\nStudent Record by index: \n");
+                    printf("\n*************************************\n\nStudent Record by index: \n");
                     printf("Roll: %d\n", s1.roll);
                     printf("First Name: %s\n", s1.fname);
                     printf("Middle Name: %s\n", s1.mname);
                     printf("Surname: %s\n", s1.sname);
                     printf("Description: %s\n", s1.desc);
+                    printf("\n\n**************************************\n");
                     free(s1.desc);
                 }
                 break;
