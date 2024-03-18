@@ -161,7 +161,7 @@ struct student *search_student_by_index(struct student *s,int i, FILE *data_file
     char ch[1];
     read(data_file->_fileno,ch,sizeof(char));
     // printf("\nfirst char from file :%c", ch[0]); // Print character or do whatever processing you need
-    while ((ch[0] != '\n') && (ch[0] != EOF) && (ch[0] != '\0') && (j<15)) {
+    while ((ch[0] != '\n') && (ch[0] != EOF) && (ch[0] != '\0')) {
         desc[j]=ch[0];
         j++;
         // printf("\n char from file :%c", ch[0]); // Print character or do whatever processing you need
@@ -376,6 +376,7 @@ void modify_student_by_roll(int choice, int roll,FILE *data_file, FILE *index_fi
                             printf("\nenter desc: ");
                             char tempDesc[MAX_DESC];
                             scanf(" %[^\n]s",tempDesc);
+                            printf("\nnew Desc:%s",tempDesc);
                             strcat(tempDesc,"\0");
                             // Dynamically allocate memory for description based on input size
                             s1.desc = (char *)malloc((strlen(tempDesc) + 1) * sizeof(char));
@@ -584,6 +585,44 @@ void compress_files(FILE *data_file, FILE *index_file){
 //     printf("\nAfter deleting %d students\n",no_of_students); 
 // }
 
+void show_all(FILE *data_file, FILE *index_file){
+    lseek(index_file->_fileno,0,SEEK_SET);
+    int no_of_students;
+    read(index_file->_fileno,&no_of_students,sizeof(int));
+    struct student s1;
+    
+    for (int i = 1; i <= no_of_students; i++)
+    {
+                    search_student_by_index(&s1,i,data_file,index_file);
+
+                    // Display the student record 
+                    printf("\n*************************************\n\nStudent Record by index: \n");
+                    printf("Roll: %d\n", s1.roll);
+                    printf("First Name: %s\n", s1.fname);
+                    printf("Middle Name: %s\n", s1.mname);
+                    printf("Surname: %s\n", s1.sname);
+                    printf("Description: %s\n", s1.desc);
+                    printf("\n\n**************************************\n");
+                    free(s1.desc);
+                    if (i%5==0)
+                    {
+                        int choice;
+                        printf("\n0: STOP\n1: Next page\n:");
+                        scanf("%d",&choice);
+                        if (choice)
+                        {
+                            continue;
+                        }
+                        else{
+                            return;
+                        }
+                        
+                        
+                    }
+                    
+    }
+    
+}
 
 int main() {
     int choice;
@@ -609,6 +648,7 @@ int main() {
         printf("5. Delete student\n");
         printf("6. Modify student\n");
         printf("7. Compress file\n");
+        printf("8. Show all students\n");
         printf("Enter 0 to exit\n");
         scanf("%d", &choice);
         int search_roll;
@@ -680,6 +720,21 @@ int main() {
                 break;
             case 7:
                 compress_files(data_file,index_file);
+                    // Open student.index file
+                index_file = fopen("student.index", "r+");
+                if (index_file == NULL) {
+                    printf("Error opening student.index file.\n");
+                    return 0;
+                }
+                // Open student.data file for appending
+                data_file = fopen("student.data", "r+");
+                if (data_file == NULL) {
+                    printf("Error opening student.data file.\n");
+                    return 0;
+                }
+                break;
+            case 8:
+                show_all(data_file,index_file);
                 break;
             case 0:
                 printf("Exiting program.\n");
