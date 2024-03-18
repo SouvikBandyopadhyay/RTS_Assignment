@@ -15,7 +15,6 @@ struct student {
     char *desc;             // storing description of the student
 };
 
-// const char* FORMAT_OUT = "(%d, %s, %s, %s, %s)\n"; 
 
 // Function to create a student struct with user input
 struct student create_student() {
