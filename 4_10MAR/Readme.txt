@@ -19,5 +19,5 @@
 //
 // 7: Compress file: creates a copy of all relivant data to new files and renamed, (works like delete remove holes).
 //
-// 8: Show all: Displayes all student recods by by traversing through all indexes.
+// 8: Show all: Displayes all student recods by by traversing through all indexes, Add more than 10 students to see Next Page feature.
 //
