@@ -48,7 +48,7 @@ void add_student(int slot, struct student s, FILE *data_file, FILE *index_file)
     off_t offset = lseek(data_file->_fileno, 0, SEEK_END);
     lseek(index_file->_fileno, sizeof(int) + (first_int * sizeof(off_t)), SEEK_SET);
     write(index_file->_fileno, &offset, sizeof(off_t));
-
+    printf("\n roll: %d",s.roll);
     lseek(data_file->_fileno, 0, SEEK_END);
     write(data_file->_fileno, &s.roll, sizeof(s.roll));
     write(data_file->_fileno, s.fname, sizeof(char) * 50);
@@ -339,10 +339,6 @@ int main()
                 printf("Error opening student.data file.\n");
                 return 0;
             }
-            lseek(index_file->_fileno, 0, SEEK_SET);
-            write(index_file->_fileno, &index, sizeof(index));
-            lseek(data_file->_fileno, 0, SEEK_SET);
-            write(data_file->_fileno, &index, sizeof(index));
             break;
         case 5:
             printf("\nModify by Roll: ");
