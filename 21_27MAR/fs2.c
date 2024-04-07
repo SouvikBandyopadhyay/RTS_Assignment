@@ -512,23 +512,48 @@ int myopen(char *filename, char drive)
 
 int mywrite(int fileno, int size, char *buffer)
 {
+    int k=0;
     // open file in drive
     struct FileSystem *fs = search_fs_mounted_drive(OpenFileTable[fileno].drive);
 
     int no_blocks_req = size / (fs->SB.size_block-sizeof(int));
+    if (size%(fs->SB.size_block-sizeof(int)) != 0)
+    {
+        no_blocks_req++;
+    }
+    
+    int head_block = fs->FDs[OpenFileTable[fileno].index_file].first_block_num; 
 
     for (int i = 0; i < no_blocks_req; i++)
     {
-        if (i==0)
+        // make a db except for i==0
+        if (i!=0)
         {
-            fs->DBs[fs->FDs->first_block_num].data=malloc((fs->SB.size_block-sizeof(int)));
-            for (int i = 0; i < (fs->SB.size_block-sizeof(int)); i++)
+            
+            if (fs->DBs[head_block].next_block == END_OF_FILE) 
             {
-                fs->DBs[fs->FDs->first_block_num].data[i]=buffer[i];
+                fs->DBs[head_block].next_block = get_free_block(fs);
             }
+            head_block= fs->DBs[head_block].next_block;
+        }
+        
+        // write on the data block
+        fs->DBs[head_block].data= malloc(fs->SB.size_block-sizeof(int));
+        for (int i = 0; (i < (fs->SB.size_block-sizeof(int))) && (k < size); i++)
+            {
+
+                fs->DBs[head_block].data[i]=buffer[k];
+                k++;
+            }
+
+        // if (i==0)
+        // {
+            // fs->DBs[fs->FDs->first_block_num].data=malloc((fs->SB.size_block-sizeof(int)));
+            
+
         // int freedb=get_free_block(fs);
             
-        }
+        // }
         
         // fs->DBs[freedb]
     }
@@ -538,9 +563,52 @@ int mywrite(int fileno, int size, char *buffer)
     // recrute blocks for filename - > block will point to a free block; get_free_block()
     // traverse through buffer , write data size amt of buffer in DB
     // next block
+    OpenFileTable[fileno].pointer=size;
+    update_file(fs);
+    return OK;
 };
 
-int myread(char *filename, char drive, int size, char *buffer){};
+int get_file_size(int fileno){
+    return OpenFileTable[fileno].pointer;
+    // int k=1;
+    // // open file in drive
+    // struct FileSystem *fs = search_fs_mounted_drive(OpenFileTable[fileno].drive);
+
+    // int head_block = fs->FDs[OpenFileTable[fileno].index_file].first_block_num; 
+
+    // for (; head_block != END_OF_FILE;)
+    // {
+    //     head_block= fs->DBs[head_block].next_block;
+    //     k=k+fs->DBs[head_block].data;
+    // }
+    // return k;
+};
+
+int myread(int fileno, int size, char *buffer){
+    int k=0;
+    // open file in drive
+    struct FileSystem *fs = search_fs_mounted_drive(OpenFileTable[fileno].drive);
+
+    
+    int head_block = fs->FDs[OpenFileTable[fileno].index_file].first_block_num; 
+
+    for (int i = 0; head_block != END_OF_FILE; i++)
+    {
+        if (i!=0)
+        {
+            head_block= fs->DBs[head_block].next_block;
+        }
+        
+        // read the data block
+        for (int i = 0; (i < (fs->SB.size_block-sizeof(int))) && (k < size); i++)
+            {
+                buffer[k] = fs->DBs[head_block].data[i];
+                // printf("%c %d\n",buffer[k],k);
+                k++;
+            }
+    }
+    return OK;
+};
 
 int myclose(int i)
 {
@@ -557,7 +625,16 @@ int myclose(int i)
 
 // **********************My APP***********************
 
-int mycopy(){};
+int mycopy(char drivefrom, char * filefrom, char driveto, char * fileto){
+    struct FileSystem * fsfrom= search_fs_mounted_drive(drivefrom);
+    struct FileSystem * fsto= search_fs_mounted_drive(driveto);
+    int fromfile=myopen(filefrom,drivefrom);
+    int tofile=myopen(fileto,driveto);
+    int size=get_file_size(fromfile);
+    char * buff= malloc(size);
+    myread(fromfile, size, buff);
+    // mywrite(tofile, size, buff);
+};
 
 int mycopyfromOS(){};
 
@@ -639,9 +716,19 @@ int main()
 
     printOFT();
 
-    mylist('d');
+    // mywrite(file, 2000, "41215860590629816389251980957455255730155710435674684626245666084393793616482987125324178198059320781825461589955444130108871711927477012400730559127449290285139855855795741060689401197377918864540098853447199157431791899507065683757154258998938140405895442669615827408814362516128167755458426971247008678091628782691016953845351119520754601206232099582197190925708421858807503773995899584581864638961939622477014779811883140516122979636669553682940016484008483370906069593700237526658072176275846341948371509190795692277659646377584693928105463848459215741845100493135662293787255817249876094923789273113624767657818458038770168114897848335522321815677830230689592923307874512937445357737238814332961021551806340754766338655836538164430385084475305451913088948628482208681810003270486886440424488448428564585575857398296725650017114239976849692278893331428800129029854516648938422816956838712763917721234581950963319757487498296193720592300683865159145788995898018972468634234891264079627904792617054970587570257734904016095172320094865139389144955970801046564962155296896400386146515352805936982575675257512834233883150839809517598882121891835736471228302344470500643214679841126004640759081645074984770684974180204141279108181984872433577580835894157718737059012217674185080130046358657091299039276314791972875557110906549769833019250505897781548691406714481324008898276124299090818069963947300724406256886094552595392412206067897483596603626388854074128366778128106142689927030614246287278703886770120199428169746534890342020933135838826237936129647990617973849501976780923133281386103031960632468544310343515365768259710941290186844455857151044998155187152302267558175698186094378655963802978736460233484318082146982355082026218014791520985605556148882724225307825462489850231205527409435454200908196394858699328799780089975091299802658522015017371193941540300582076074307880120290463510117743980558464569351693059687192417606907795898531636558344188650084593334106922209654039565254212701597929");
+    mywrite(file, 20, "Souvik is good and nic e");
+    char buff[20];
+    myread(file,20,buff);
+    printf("\nRead from file %s\n",buff);
+    // printFS('c');
+    mycopy('c',"sec in c",'d',"Anew File");
 
-    mylist('c');
+    file = myopen("Anew File", 'd');
+    
+    myread(file,20,buff);
+    
+    printf("\nRead from d's file %s\n",buff);
     // myunmount('d');
     // printf("\n lising d\n");
     // mylist('d');
