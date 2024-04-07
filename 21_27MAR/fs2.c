@@ -500,13 +500,13 @@ int myopen(char *filename, char drive)
         index_file = create_file(filename, fs);
     }
     int OFTindex = get_free_OFTE();
-    printf("\nindex for oft %d", OFTindex);
+    // printf("\nindex for oft %d", OFTindex);
     OpenFileTable[OFTindex].drive = fs->drive;
     OpenFileTable[OFTindex].index_file = index_file;
     OpenFileTable[OFTindex].pointer = 0;
     no_open_files++;
 
-    printOFT();
+    // printOFT();
     return (OFTindex);
 };
 
@@ -521,7 +521,7 @@ int mywrite(int fileno, int size, char *buffer)
     {
         no_blocks_req++;
     }
-    
+    // printf("\nNo of blocks req %d datasize %lu size %d\n",no_blocks_req, (fs->SB.size_block-sizeof(int)), size);
     int head_block = fs->FDs[OpenFileTable[fileno].index_file].first_block_num; 
 
     for (int i = 0; i < no_blocks_req; i++)
@@ -543,6 +543,7 @@ int mywrite(int fileno, int size, char *buffer)
             {
 
                 fs->DBs[head_block].data[i]=buffer[k];
+                // printf("\nWriting char %c %d at drive %c",buffer[k],k,fs->drive);
                 k++;
             }
 
@@ -563,13 +564,16 @@ int mywrite(int fileno, int size, char *buffer)
     // recrute blocks for filename - > block will point to a free block; get_free_block()
     // traverse through buffer , write data size amt of buffer in DB
     // next block
-    OpenFileTable[fileno].pointer=size;
+    fs->FDs[OpenFileTable[fileno].index_file].size_file=size;
+    // printf("\n size written %d, current pointer val %d\n" , OpenFileTable[fileno].pointer, size);
+    printOFT();
     update_file(fs);
     return OK;
 };
 
 int get_file_size(int fileno){
-    return OpenFileTable[fileno].pointer;
+    struct FileSystem * fs=search_fs_mounted_drive(OpenFileTable[fileno].drive);
+     return fs->FDs[OpenFileTable[fileno].index_file].size_file;
     // int k=1;
     // // open file in drive
     // struct FileSystem *fs = search_fs_mounted_drive(OpenFileTable[fileno].drive);
@@ -631,14 +635,46 @@ int mycopy(char drivefrom, char * filefrom, char driveto, char * fileto){
     int fromfile=myopen(filefrom,drivefrom);
     int tofile=myopen(fileto,driveto);
     int size=get_file_size(fromfile);
+    // printf("\nread file size to be coppeid %d\n",size);
     char * buff= malloc(size);
     myread(fromfile, size, buff);
-    // mywrite(tofile, size, buff);
+    // printf("\nwrititng to D %c\n",OpenFileTable[tofile].drive);
+    mywrite(tofile, size, buff);
+    myclose(fromfile);
+    myclose(tofile);
+    update_file(fsto);
+    return OK;
 };
 
-int mycopyfromOS(){};
+int mycopyfromOS(char * source, char * destination_filename, char destination_drive){
+    int fd = open(source, O_RDONLY);
 
-int mycopytoOS(){};
+    off_t file_size = lseek(fd, 0, SEEK_END);
+    
+    char *buffer = (char *)malloc(file_size);
+
+    lseek(fd, 0, SEEK_SET); 
+    read(fd, buffer, file_size);
+    close(fd);
+    int file = myopen(destination_filename, destination_drive);
+    mywrite(file, file_size, buffer);
+    myclose(file);
+};
+
+int mycopytoOS(char * destination, char * source_filename, char source_drive){
+    
+    int file = myopen(source_filename, source_drive);
+    int size= get_file_size(file);
+    char * buffer= malloc(size);
+    myread(file, size, buffer);
+    myclose(file);
+
+    int fd = open(destination, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+
+    write(fd, buffer, size);
+    close(fd);
+
+};
 
 int main()
 {
@@ -714,10 +750,13 @@ int main()
     file = myopen("sec in c", 'c');
     printf("\nopen file2 : %d", file);
 
-    printOFT();
 
     // mywrite(file, 2000, "41215860590629816389251980957455255730155710435674684626245666084393793616482987125324178198059320781825461589955444130108871711927477012400730559127449290285139855855795741060689401197377918864540098853447199157431791899507065683757154258998938140405895442669615827408814362516128167755458426971247008678091628782691016953845351119520754601206232099582197190925708421858807503773995899584581864638961939622477014779811883140516122979636669553682940016484008483370906069593700237526658072176275846341948371509190795692277659646377584693928105463848459215741845100493135662293787255817249876094923789273113624767657818458038770168114897848335522321815677830230689592923307874512937445357737238814332961021551806340754766338655836538164430385084475305451913088948628482208681810003270486886440424488448428564585575857398296725650017114239976849692278893331428800129029854516648938422816956838712763917721234581950963319757487498296193720592300683865159145788995898018972468634234891264079627904792617054970587570257734904016095172320094865139389144955970801046564962155296896400386146515352805936982575675257512834233883150839809517598882121891835736471228302344470500643214679841126004640759081645074984770684974180204141279108181984872433577580835894157718737059012217674185080130046358657091299039276314791972875557110906549769833019250505897781548691406714481324008898276124299090818069963947300724406256886094552595392412206067897483596603626388854074128366778128106142689927030614246287278703886770120199428169746534890342020933135838826237936129647990617973849501976780923133281386103031960632468544310343515365768259710941290186844455857151044998155187152302267558175698186094378655963802978736460233484318082146982355082026218014791520985605556148882724225307825462489850231205527409435454200908196394858699328799780089975091299802658522015017371193941540300582076074307880120290463510117743980558464569351693059687192417606907795898531636558344188650084593334106922209654039565254212701597929");
-    mywrite(file, 20, "Souvik is good and nic e");
+    mywrite(file, 20, "12345678900987654321");
+    myclose(file);
+    file = myopen("sec in c", 'c');
+    printf("\nopen file: %d", file);
+
     char buff[20];
     myread(file,20,buff);
     printf("\nRead from file %s\n",buff);
@@ -726,9 +765,26 @@ int main()
 
     file = myopen("Anew File", 'd');
     
+    printOFT();
     myread(file,20,buff);
     
     printf("\nRead from d's file %s\n",buff);
+    
+    mycopytoOS("aa.txt","Anew File", 'd');
+
+    int f=open("aa.txt",O_RDONLY);
+    char buff2[20];
+    read(file,buff2,20);
+    printf("\nreading from OS %s\n",buff2);
+    
+    mycopyfromOS("aa.txt","X File", 'c');
+
+    file = myopen("X File", 'c');
+    
+    printOFT();
+    myread(file,20,buff2);
+    
+    printf("\nRead from my copy file %s\n",buff);
     // myunmount('d');
     // printf("\n lising d\n");
     // mylist('d');
