@@ -4,6 +4,10 @@ Data Structures:
         num_files
         num_blocks
         size_block
+        num_used_block
+        num_free_block
+        file_descriptor_block
+        used_block_bit_pattern
     }
     File Descriptor entry{
         file_name[20]
@@ -56,15 +60,23 @@ Funtionalities with Data:
 #define FILENAME_SIZE 20
 #define BLOCK_DATA_SIZE 512
 #define MAX_FD_ENTRY 10
+#define MAX_NO_BLOCKS 32576
 #define MODIFIED_TIME_SIZE 32
 #define OK 0
 #define ERROR -1
+#define USED 0
+#define UNUSED -1
 
 struct SuperBlock
 {
     int num_files;
     int num_blocks;
     int size_block;
+    int num_used_block;
+    int num_free_block;
+    int file_descriptor_block;
+    char used_block_bit_pattern[(int)(MAX_NO_BLOCKS/8)];
+
 } SuperBlock;
 
 struct FileDescriptorEntry
@@ -75,11 +87,39 @@ struct FileDescriptorEntry
     char modified[MODIFIED_TIME_SIZE];
 } *FileDescriptors;
 
+struct FileDescriptorBlock
+{
+    struct FileDescriptorEntry *Entries;
+} FDBlock;
+
 struct DataBlock
 {
     char data[BLOCK_DATA_SIZE];
     int next_block;
 } *DataBlocks;
+
+struct OpenFileTableEntry
+{
+    int file_no;
+    int pointer;
+} *OpenFileTable;
+
+
+// Function to set a specific bit in the array
+void set_bit(char* bit_array, int index) {
+    bit_array[index / 8] |= (1 << (index % 8));
+}
+
+// Function to clear a specific bit in the array
+void clear_bit(char* bit_array, int index) {
+    bit_array[index / 8] &= ~(1 << (index % 8));
+}
+
+// Function to check if a specific bit is set
+int check_bit(char* bit_array, int index) {
+    return (bit_array[index / 8] & (1 << (index % 8))) != 0;
+}
+
 
 void getCurrentTimeAsString(char *timeString) {
     time_t currentTime;
@@ -219,7 +259,7 @@ int mymkfs(int size, char *filename)
     SuperBlock.num_blocks = (size - metadata_size) / datablock_size;
     SuperBlock.size_block = datablock_size;
 
-    FileDescriptors = malloc(sizeof(struct FileDescriptorEntry) * MAX_FD_ENTRY);
+    FileDescriptors = malloc(sizeof(struct FileDescriptorEntry) * (sizeof(struct FileDescriptorEntry)/SuperBlock.size_block));
     for (int i = 0; i < MAX_FD_ENTRY; i++)
     {
         strcpy(FileDescriptors[i].file_name, "Empty");
