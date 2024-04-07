@@ -524,12 +524,12 @@ int mywrite(int fileno, int size, char *buffer)
             fs->DBs[fs->FDs->first_block_num].data=malloc((fs->SB.size_block-sizeof(int)));
             for (int i = 0; i < (fs->SB.size_block-sizeof(int)); i++)
             {
-                fs->DBs[fs->FDs->first_block_num].data=
+                fs->DBs[fs->FDs->first_block_num].data[i]=buffer[i];
             }
+        // int freedb=get_free_block(fs);
             
         }
         
-        // int freedb=get_free_block(fs);
         // fs->DBs[freedb]
     }
     
