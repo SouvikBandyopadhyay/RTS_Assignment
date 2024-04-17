@@ -245,13 +245,6 @@ int mymkfs(char *filename, int size_block, int no_block)
     writeSuperBlock(filename, 0, SuperBlock.size_block, &SuperBlock);
     writeBlock(filename, 1, SuperBlock.size_block, FileDescriptors);
 
-    int file, firstint, secondint;
-    file = open(filename, O_RDWR, S_IRUSR | S_IWUSR);
-    lseek(file, 0, SEEK_SET);
-    read(file, &firstint, sizeof(int));
-    read(file, &secondint, sizeof(int));
-    close(file);
-    printf("first int %d, second int %d", firstint, secondint);
 
     for (int i = 0; i < no_block - 2; i++)
     {
@@ -790,103 +783,106 @@ int main()
 
     while (1)
     {
-        printf("\nMenu:\n");
-        printf("1. Create File System (mymkfs)\n");
-        printf("2. Print File System Metadata (printFS)\n");
-        printf("3. Mount File System (mymount)\n");
-        printf("4. Unmount File System (myunmount)\n");
-        printf("5. List Files (mylist)\n");
-        printf("6. Print Open File Table (printOFT)\n");
-        printf("7. Print Mounted File Systems (print_mounted_FSs)\n");
-        printf("8. Open File (myopen)\n");
-        printf("9. Write to File (mywrite)\n");
-        printf("10. Get File Size (get_file_size)\n");
-        printf("11. Read from File (myread)\n");
-        printf("12. Close File (myclose)\n");
-        printf("13. Copy File within File System (mycopy)\n");
-        printf("14. Copy File from OS to File System (mycopyfromOS)\n");
-        printf("15. Copy File from File System to OS (mycopytoOS)\n");
-        printf("16. Exit\n");
+        printf("\nMenu:\n========File System======\n");
+        printf("11. Create File System (mymkfs) inputs: filename\n");
+        printf("12. Mount File System (mymount) inputs: filename, drive\n");
+        printf("13. Print File System Metadata (printFS) inputs: drive\n");
+        printf("14. Print Mounted File Systems (print_mounted_FSs)\n");
+        printf("15. Unmount File System (myunmount) inputs: drive\n\n");
+        printf("========Files in mounted FS========\n");
+        printf("21. Open File (myopen) inputs: filename, drive\n");
+        printf("22. Print Open File Table (printOFT)\n");
+        printf("23. Write to File (mywrite) inputs: filenumber, size, content\n");
+        printf("24. Get File Size (get_file_size) inputs: filenumber\n");
+        printf("25. Read from File (myread) inputs: filenumber, size\n");
+        printf("26. Close File (myclose) inputs: filenumber\n");
+        printf("27. List Files (mylist) inputs: drive\n\n");
+        printf("========Copy funtions========\n");
+        printf("31. Copy File within File System (mycopy) inputs: filename, drive, filename, drive\n");
+        printf("32. Copy File from OS to File System (mycopyfromOS) inputs: OSfilename, filename, drive\n");
+        printf("33. Copy File from File System to OS (mycopytoOS) inputs: OSfilename, filename, drive\n");
+        printf("00. Exit\n");
 
         printf("Enter your choice: ");
         scanf("%d", &choice);
 
         switch (choice)
         {
-        case 1:
+        case 11:
             printf("Enter filename, size of block (min 512), and number of blocks(min 20): ");
             scanf("%s %d %d", filename, &size_block, &no_block);
             mymkfs(filename, size_block, no_block);
             break;
-        case 2:
-            printf("Enter drive letter: ");
-            scanf(" %c", &drive);
-            printFS(drive);
-            break;
-        case 3:
+        case 12:
             printf("Enter filename and drive letter: ");
             scanf("%s %c", filename, &drive);
             mymount(filename, drive);
             break;
-        case 4:
+        case 13:
+            printf("Enter drive letter: ");
+            scanf(" %c", &drive);
+            printFS(drive);
+            break;
+        case 15:
             printf("Enter drive letter: ");
             scanf(" %c", &drive);
             myunmount(drive);
             break;
-        case 5:
+        case 27:
             printf("Enter drive letter: ");
             scanf(" %c", &drive);
             mylist(drive);
             break;
-        case 6:
+        case 22:
             printOFT();
             break;
-        case 7:
+        case 14:
             print_mounted_FSs();
             break;
-        case 8:
+        case 21:
             printf("Enter filename and drive letter: ");
             scanf("%s %c", filename, &drive);
             int file = myopen(filename, drive);
             printf("\nOpened File : %d", file);
             break;
-        case 9:
+        case 23:
             printf("Enter file number, size, and data: ");
             scanf("%d %d %s", &fileno, &size, buffer);
             mywrite(fileno, size, buffer);
             break;
-        case 10:
+        case 24:
             printf("Enter file number: ");
             scanf("%d", &fileno);
             printf("File size: %d\n", get_file_size(fileno));
             break;
-        case 11:
+        case 25:
             printf("Enter file number and size: ");
             scanf("%d %d", &fileno, &size);
-            myread(fileno, size, buffer);
-            printf("Data read: %s\n", buffer);
+            char * bufferread = malloc(size);
+            myread(fileno, size, bufferread);
+            printf("Data read: %s\n", bufferread);
             break;
-        case 12:
+        case 26:
             printf("Enter file number: ");
             scanf("%d", &fileno);
             myclose(fileno);
             break;
-        case 13:
+        case 31:
             printf("Enter source drive, filename, destination drive, and destination filename: ");
             scanf(" %c %s %c %s", &drivefrom, filefrom, &driveto, fileto);
             mycopy(drivefrom, filefrom, driveto, fileto);
             break;
-        case 14:
+        case 32:
             printf("Enter source filename, destination filename, and destination drive: ");
             scanf("%s %s %c", filename, fileto, &drive);
             mycopyfromOS(filename, fileto, drive);
             break;
-        case 15:
+        case 33:
             printf("Enter destination filename, source filename, and source drive: ");
             scanf("%s %s %c", filename, filefrom, &drive);
             mycopytoOS(filename, filefrom, drive);
             break;
-        case 16:
+        case 00:
             printf("Exiting...");
             return 0;
         default:
