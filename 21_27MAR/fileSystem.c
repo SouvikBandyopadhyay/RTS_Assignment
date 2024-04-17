@@ -86,6 +86,21 @@ int check_bit(char *bit_array, int index)
 }
 
 // *********************DEVICE DRIVERS****************************************
+int writeSuperBlock(char *filename, int block_no, int block_size, struct SuperBlock *buffer)
+{
+    int file = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (file == ERROR)
+    {
+        printf("Error in creating file \n");
+        return ERROR;
+    }
+    lseek(file, block_size * block_no, SEEK_SET);
+
+    write(file, buffer, sizeof(struct SuperBlock));
+    write(file, buffer->used_block_bit_pattern, block_size - sizeof(struct SuperBlock));
+
+    close(file);
+}
 
 int writeBlock(char *filename, int block_no, int block_size, void *buffer)
 {
@@ -96,7 +111,44 @@ int writeBlock(char *filename, int block_no, int block_size, void *buffer)
         return ERROR;
     }
     lseek(file, block_size * block_no, SEEK_SET);
-    write(file, buffer, block_size);
+
+    int status = write(file, buffer, block_size);
+    if (status == -1)
+    {
+        perror("Error writing to stdout");
+    }
+
+    close(file);
+}
+
+int writeDataBlock(char *filename, int block_no, int block_size, struct DataBlock *buffer)
+{
+    int file = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (file == ERROR)
+    {
+        printf("Error in creating file \n");
+        return ERROR;
+    }
+    lseek(file, block_size * block_no, SEEK_SET);
+
+    write(file, &buffer->next_block, sizeof(int));
+    write(file, buffer->data, block_size - sizeof(int));
+
+    close(file);
+}
+
+int readSuperBlock(char *filename, int block_no, int block_size, struct SuperBlock *buffer)
+{
+    int file = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (file == ERROR)
+    {
+        printf("Error in creating file \n");
+        return ERROR;
+    }
+    lseek(file, block_size * block_no, SEEK_SET);
+    read(file, buffer, sizeof(struct SuperBlock));
+    buffer->used_block_bit_pattern = malloc(buffer->size_block - sizeof(struct SuperBlock));
+    read(file, buffer->used_block_bit_pattern, block_size - sizeof(struct SuperBlock));
     close(file);
 }
 
@@ -110,6 +162,20 @@ int readBlock(char *filename, int block_no, int block_size, void *buffer)
     }
     lseek(file, block_size * block_no, SEEK_SET);
     read(file, buffer, block_size);
+    close(file);
+}
+
+int readDataBlock(char *filename, int block_no, int block_size, struct DataBlock *buffer)
+{
+    int file = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (file == ERROR)
+    {
+        printf("Error in creating file \n");
+        return ERROR;
+    }
+    lseek(file, block_size * block_no, SEEK_SET);
+    read(file, &buffer->next_block, sizeof(int));
+    read(file, buffer->data, block_size - sizeof(int));
     close(file);
 }
 
@@ -148,7 +214,7 @@ int mymkfs(char *filename, int size_block, int no_block)
     SuperBlock.num_free_block = no_block - 2;
     SuperBlock.file_descriptor_block = 1;
     SuperBlock.no_file_descriptor = size_block / sizeof(struct FileDescriptorEntry);
-    SuperBlock.used_block_bit_pattern = malloc(size_block - sizeof(struct SuperBlock) - 8);
+    SuperBlock.used_block_bit_pattern = malloc(size_block - sizeof(struct SuperBlock));
     for (int i = 0; i < no_block; i++)
     {
         clear_bit(SuperBlock.used_block_bit_pattern, i);
@@ -174,12 +240,24 @@ int mymkfs(char *filename, int size_block, int no_block)
     }
 
     initFile(filename, size_block, no_block + 1);
-    writeBlock(filename, 0, SuperBlock.size_block, &SuperBlock);
+    printf("SB. first int %d, second int %d", SuperBlock.size_block, SuperBlock.num_blocks);
+
+    writeSuperBlock(filename, 0, SuperBlock.size_block, &SuperBlock);
     writeBlock(filename, 1, SuperBlock.size_block, FileDescriptors);
-    for (int i = 2; i < no_block; i++)
+
+    int file, firstint, secondint;
+    file = open(filename, O_RDWR, S_IRUSR | S_IWUSR);
+    lseek(file, 0, SEEK_SET);
+    read(file, &firstint, sizeof(int));
+    read(file, &secondint, sizeof(int));
+    close(file);
+    printf("first int %d, second int %d", firstint, secondint);
+
+    for (int i = 0; i < no_block - 2; i++)
     {
-        writeBlock(filename, i, SuperBlock.size_block, &DataBlocks[(i - 2)]);
-        free(DataBlocks[i - 2].data);
+        strcpy(DataBlocks[i].data, "Nothing");
+        writeDataBlock(filename, i + 2, SuperBlock.size_block, &DataBlocks[i]);
+        free(DataBlocks[i].data);
     }
 
     free(DataBlocks);
@@ -239,12 +317,12 @@ int mymount(char *filename, char drive)
     read(file, &fs_blocksize, sizeof(int));
     int fs_no_blocks;
     read(file, &fs_no_blocks, sizeof(int));
-    struct FileSystem *fs = malloc(sizeof(char) * 101 + fs_blocksize * 2 + sizeof(struct DataBlock) * fs_no_blocks - 2);
+    struct FileSystem *fs = malloc(fs_blocksize * fs_no_blocks);
     fs->drive = drive;
     strcpy(fs->filename, filename);
     printf("\n read block size in mount %d\n", fs_blocksize);
-    fs->SB.used_block_bit_pattern = malloc(fs_blocksize - sizeof(struct SuperBlock) - 8);
-    int status = readBlock(filename, 0, fs_blocksize, &fs->SB);
+    fs->SB.used_block_bit_pattern = malloc(fs_blocksize - sizeof(struct SuperBlock));
+    int status = readSuperBlock(filename, 0, fs_blocksize, &fs->SB);
     printf("\nDone Reading SB status %d\n", status);
     fs->FDs = malloc(fs->SB.size_block);
     status = readBlock(filename, fs->SB.file_descriptor_block, fs->SB.size_block, fs->FDs);
@@ -253,9 +331,9 @@ int mymount(char *filename, char drive)
     for (int j = 2; j < fs->SB.num_blocks; j++)
     {
         fs->DBs[j - 2].data = malloc((fs->SB.size_block - sizeof(int)));
-        status = readBlock(filename, j, fs->SB.size_block, &fs->DBs[j - 2]);
+        status = readDataBlock(filename, j, fs->SB.size_block, &fs->DBs[j - 2]);
 
-        printf("Done Reading DB %d status %d\n", j - 2, status);
+        // printf("Done Reading DB %d status %d\n", j - 2, status);
     }
     //         break;
     //     }
@@ -341,7 +419,7 @@ struct FileSystem *search_fs_mounted_drive(char drive)
 
 int mylist(char drive)
 {
-    struct FileSystem * fs = search_fs_mounted_drive(drive);
+    struct FileSystem *fs = search_fs_mounted_drive(drive);
     // for (int i = 0; i < MAX_MOUNTS; i++)
     // {
     //     if (FSs[i].drive == drive)
@@ -350,7 +428,6 @@ int mylist(char drive)
     {
         return ERROR;
     }
-    
 
     printf("\n%d Files :\n", fs->SB.num_files);
     for (int j = 0; j < fs->SB.no_file_descriptor; j++)
@@ -400,11 +477,11 @@ char *getCurrentTimeAsString(char *epochString)
 
 int update_file(struct FileSystem *fs)
 {
-    writeBlock(fs->filename, 0, fs->SB.size_block, &fs->SB);
+    writeSuperBlock(fs->filename, 0, fs->SB.size_block, &fs->SB);
     writeBlock(fs->filename, 1, fs->SB.size_block, fs->FDs);
     for (int i = 0; i < fs->SB.num_blocks - 2; i++)
     {
-        writeBlock(fs->filename, i + 2, fs->SB.size_block, &fs->DBs[i]);
+        writeDataBlock(fs->filename, i + 2, fs->SB.size_block, &fs->DBs[i]);
     }
     return OK;
 }
@@ -486,7 +563,7 @@ int myopen(char *filename, char drive)
     {
         return ERROR;
     }
-    
+
     // for (int i = 0; i < MAX_MOUNTS; i++)
     // {
     //     if (FSs[i].drive == drive)
@@ -629,7 +706,7 @@ int myread(int fileno, int size, char *buffer)
         for (int i = 0; (i < (fs->SB.size_block - sizeof(int))) && (k < size); i++)
         {
             buffer[k] = fs->DBs[head_block].data[i];
-            // printf("%c %d\n",buffer[k],k);
+            printf("char:%c k:%d i:%d\n", buffer[k], k, i);
             k++;
         }
     }
@@ -770,7 +847,8 @@ int main()
         case 8:
             printf("Enter filename and drive letter: ");
             scanf("%s %c", filename, &drive);
-            myopen(filename, drive);
+            int file = myopen(filename, drive);
+            printf("\nOpened File : %d", file);
             break;
         case 9:
             printf("Enter file number, size, and data: ");
@@ -937,62 +1015,62 @@ int main()
 
 //     return 0;
 
-    // while(loop){
-    //     printf("Choose a function to call:\n");
-    //     printf("1. Create a FS\n");
-    //     printf("2. Mount a FS\n");
-    //     printf("3. List all files in a FS\n");
-    //     printf("4. Copy File\n");
-    //     printf("5. Copy to OS\n");
-    //     printf("6. Copy from OS\n");
-    //     printf("6. exit\n");
+// while(loop){
+//     printf("Choose a function to call:\n");
+//     printf("1. Create a FS\n");
+//     printf("2. Mount a FS\n");
+//     printf("3. List all files in a FS\n");
+//     printf("4. Copy File\n");
+//     printf("5. Copy to OS\n");
+//     printf("6. Copy from OS\n");
+//     printf("6. exit\n");
 
-    //     scanf("%d", &choice);
-    //     switch (choice) {
-    //         case 1:
-    //             printf("Enter filename: ");
-    //             scanf("%s", filename);
-    //             myreadfs(filename);
-    //             break;
-    //         case 2:
-    //             printf("Enter filename: ");
-    //             scanf("%s", filename);
-    //             printf("Enter destination: ");
-    //             scanf("%s", destination);
-    //             mymount(filename, destination);
-    //             break;
-    //         case 3:
-    //             printf("Enter filename: ");
-    //             scanf("%s", filename);
-    //             mydir(filename);
-    //             break;
-    //         case 4:
-    //             printfs();
-    //             break;
-    //         case 5:
-    //             printf("Enter size: ");
-    //             scanf("%d", &size);
-    //             printf("Enter filename: ");
-    //             scanf("%s", filename);
-    //             mymkfs(size, filename);
-    //             break;
-    //         case 6:
-    //             printf("Enter source: ");
-    //             scanf("%s", filename);
-    //             printf("Enter filename: ");
-    //             scanf("%s", destination);
-    //             int fileno = myopen(filename, destination);
-    //             printf("\n File No : %d\n",fileno);
-    //             break;
-    //         case 10:
-    //             loop = 0;
-    //             break;
-    //         default:
-    //             printf("Invalid choice!\n");
-    //             break;
-    //     }
-    // }
-    // return 0;
+//     scanf("%d", &choice);
+//     switch (choice) {
+//         case 1:
+//             printf("Enter filename: ");
+//             scanf("%s", filename);
+//             myreadfs(filename);
+//             break;
+//         case 2:
+//             printf("Enter filename: ");
+//             scanf("%s", filename);
+//             printf("Enter destination: ");
+//             scanf("%s", destination);
+//             mymount(filename, destination);
+//             break;
+//         case 3:
+//             printf("Enter filename: ");
+//             scanf("%s", filename);
+//             mydir(filename);
+//             break;
+//         case 4:
+//             printfs();
+//             break;
+//         case 5:
+//             printf("Enter size: ");
+//             scanf("%d", &size);
+//             printf("Enter filename: ");
+//             scanf("%s", filename);
+//             mymkfs(size, filename);
+//             break;
+//         case 6:
+//             printf("Enter source: ");
+//             scanf("%s", filename);
+//             printf("Enter filename: ");
+//             scanf("%s", destination);
+//             int fileno = myopen(filename, destination);
+//             printf("\n File No : %d\n",fileno);
+//             break;
+//         case 10:
+//             loop = 0;
+//             break;
+//         default:
+//             printf("Invalid choice!\n");
+//             break;
+//     }
+// }
+// return 0;
 // }
 
 // ***********************END OF MY APP************
